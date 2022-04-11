@@ -12,6 +12,7 @@ from .. import links
 from .. import maskers
 from ..maskers import Masker
 from ..models import Model
+import sys
 
 class Permutation(Explainer):
     """ This method approximates the Shapley values by iterating through permutations of the inputs.
@@ -56,10 +57,10 @@ class Permutation(Explainer):
             # this signature should match the __call__ signature of the class defined below
             class Permutation(self.__class__):
                 def __call__(self, *args, max_evals=500, main_effects=False, error_bounds=False, batch_size="auto",
-                             outputs=None, silent=False):
+                             outputs=None, silent=False, use_dask=False):
                     return super().__call__(
                         *args, max_evals=max_evals, main_effects=main_effects, error_bounds=error_bounds,
-                        batch_size=batch_size, outputs=outputs, silent=silent
+                        batch_size=batch_size, outputs=outputs, silent=silent, use_dask=use_dask
                     )
             Permutation.__call__.__doc__ = self.__class__.__call__.__doc__
             self.__class__ = Permutation
@@ -68,17 +69,19 @@ class Permutation(Explainer):
 
     # note that changes to this function signature should be copied to the default call argument wrapper above
     def __call__(self, *args, max_evals=500, main_effects=False, error_bounds=False, batch_size="auto",
-                 outputs=None, silent=False):
+                 outputs=None, silent=False,use_dask=False,):
         """ Explain the output of the model on the given arguments.
         """
         return super().__call__(
             *args, max_evals=max_evals, main_effects=main_effects, error_bounds=error_bounds, batch_size=batch_size,
-            outputs=outputs, silent=silent
+            outputs=outputs, silent=silent, use_dask=use_dask
         )
 
     def explain_row(self, *row_args, max_evals, main_effects, error_bounds, batch_size, outputs, silent):
         """ Explains a single row and returns the tuple (row_values, row_expected_values, row_mask_shapes).
         """
+        print("STARTING EXPLAIN ROW")
+        sys.stdout.flush()
 
         # build a masked version of the model for the current input sample
         fm = MaskedModel(self.model, self.masker, self.link, self.linearize_link, *row_args)
@@ -167,6 +170,10 @@ class Permutation(Explainer):
             row_values = np.zeros((len(fm),) + outputs.shape[1:])
             if error_bounds:
                 row_values_history = np.zeros((2 * npermutations, len(fm),) + outputs.shape[1:])
+
+
+        print("DONE EXPLAIN ROW")
+        sys.stdout.flush()
 
         return {
             "values": row_values / (2 * npermutations),

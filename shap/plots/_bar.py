@@ -17,7 +17,7 @@ from .. import Explanation, Cohorts
 # TODO: improve the bar chart to look better like the waterfall plot with numbers inside the bars when they fit
 # TODO: Have the Explanation object track enough data so that we can tell (and so show) how many instances are in each cohort
 def bar(shap_values, max_display=10, order=Explanation.abs, clustering=None, clustering_cutoff=0.5,
-        merge_cohorts=False, show_data="auto", show=True):
+        merge_cohorts=False, show_data="auto", show=True,  ax=None):
     """ Create a bar plot of a set of SHAP values.
 
     If a single sample is passed then we plot the SHAP values as a bar chart. If an
@@ -207,8 +207,13 @@ def bar(shap_values, max_display=10, order=Explanation.abs, clustering=None, clu
     pl.yticks(list(y_pos) + list(y_pos + 1e-8), yticklabels + [l.split('=')[-1] for l in yticklabels], fontsize=13)
 
     xlen = pl.xlim()[1] - pl.xlim()[0]
-    fig = pl.gcf()
-    ax = pl.gca()
+
+    if ax is None:
+        fig = pl.gcf()
+        ax = pl.gca()
+    else:
+        fig = ax.get_figure()
+
     #xticks = ax.get_xticks()
     bbox = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
     width, height = bbox.width, bbox.height

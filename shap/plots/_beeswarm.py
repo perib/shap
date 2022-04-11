@@ -42,6 +42,8 @@ def beeswarm(shap_values, max_display=10, order=Explanation.abs.mean(0),
         unchanged.
     """
 
+    print("FOOOOOOOOO")
+
     # support passing an explanation object
     if str(type(shap_values)).endswith("Explanation'>"):
         if len(shap_values.shape) == 1:
@@ -214,6 +216,8 @@ def beeswarm(shap_values, max_display=10, order=Explanation.abs.mean(0),
         pl.subplots_adjust(hspace=0, wspace=0.1)
         if show:
             pl.show()
+        else:
+            return pl.gcf()
         return
 
     # determine how many top features we will plot

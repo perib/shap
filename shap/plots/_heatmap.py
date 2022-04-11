@@ -147,3 +147,5 @@ def heatmap(shap_values, instance_order=Explanation.hclust(), feature_values=Exp
     
     if show:
         pl.show()
+    else:
+        return pl.gcf()

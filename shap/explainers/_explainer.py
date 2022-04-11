@@ -13,7 +13,8 @@ from .._explanation import Explanation
 from .._serializable import Serializable
 from .. import explainers
 from .._serializable import Serializer, Deserializer
-
+from dask import delayed
+import dask
 
 
 class Explainer(Serializable):
@@ -191,7 +192,7 @@ class Explainer(Serializable):
 
 
     def __call__(self, *args, max_evals="auto", main_effects=False, error_bounds=False, batch_size="auto",
-                 outputs=None, silent=False, **kwargs):
+                 outputs=None, silent=False, use_dask=False, **kwargs):
         """ Explains the output of model(*args), where args is a list of parallel iteratable datasets.
 
         Note this default version could be an abstract method that is implemented by each algorithm-specific
@@ -254,25 +255,53 @@ class Explainer(Serializable):
         error_std = []
         if callable(getattr(self.masker, "feature_names", None)):
             feature_names = [[] for _ in range(len(args))]
-        for row_args in show_progress(zip(*args), num_rows, self.__class__.__name__+" explainer", silent):
-            row_result = self.explain_row(
-                *row_args, max_evals=max_evals, main_effects=main_effects, error_bounds=error_bounds,
-                batch_size=batch_size, outputs=outputs, silent=silent, **kwargs
-            )
-            values.append(row_result.get("values", None))
-            output_indices.append(row_result.get("output_indices", None))
-            expected_values.append(row_result.get("expected_values", None))
-            mask_shapes.append(row_result["mask_shapes"])
-            main_effects.append(row_result.get("main_effects", None))
-            clustering.append(row_result.get("clustering", None))
-            hierarchical_values.append(row_result.get("hierarchical_values", None))
-            tmp = row_result.get("output_names", None)
-            output_names.append(tmp(*row_args) if callable(tmp) else tmp)
-            error_std.append(row_result.get("error_std", None))
-            if callable(getattr(self.masker, "feature_names", None)):
-                row_feature_names = self.masker.feature_names(*row_args)
-                for i in range(len(row_args)):
-                    feature_names[i].append(row_feature_names[i])
+
+        if not use_dask:
+            for row_args in show_progress(zip(*args), num_rows, self.__class__.__name__+" explainer", silent):
+                row_result = self.explain_row(
+                    *row_args, max_evals=max_evals, main_effects=main_effects, error_bounds=error_bounds,
+                    batch_size=batch_size, outputs=outputs, silent=silent, **kwargs
+                )
+                values.append(row_result.get("values", None))
+                output_indices.append(row_result.get("output_indices", None))
+                expected_values.append(row_result.get("expected_values", None))
+                mask_shapes.append(row_result["mask_shapes"])
+                main_effects.append(row_result.get("main_effects", None))
+                clustering.append(row_result.get("clustering", None))
+                hierarchical_values.append(row_result.get("hierarchical_values", None))
+                tmp = row_result.get("output_names", None)
+                output_names.append(tmp(*row_args) if callable(tmp) else tmp)
+                error_std.append(row_result.get("error_std", None))
+                if callable(getattr(self.masker, "feature_names", None)):
+                    row_feature_names = self.masker.feature_names(*row_args)
+                    for i in range(len(row_args)):
+                        feature_names[i].append(row_feature_names[i])
+        else:
+            print("USING DASK")
+            row_result_dask_arr = []
+            for row_args in show_progress(zip(*args), num_rows, self.__class__.__name__+" explainer", silent):
+                row_result_dask_arr.append( delayed(self.explain_row)(
+                    *row_args, max_evals=max_evals, main_effects=main_effects, error_bounds=error_bounds,
+                    batch_size=batch_size, outputs=outputs, silent=silent, **kwargs
+                ) )
+
+            row_result_arr = dask.compute(*row_result_dask_arr)
+
+            for row_args,row_result  in zip(show_progress(zip(*args), num_rows, self.__class__.__name__+" explainer", silent), row_result_arr):   
+                values.append(row_result.get("values", None))
+                output_indices.append(row_result.get("output_indices", None))
+                expected_values.append(row_result.get("expected_values", None))
+                mask_shapes.append(row_result["mask_shapes"])
+                main_effects.append(row_result.get("main_effects", None))
+                clustering.append(row_result.get("clustering", None))
+                hierarchical_values.append(row_result.get("hierarchical_values", None))
+                tmp = row_result.get("output_names", None)
+                output_names.append(tmp(*row_args) if callable(tmp) else tmp)
+                error_std.append(row_result.get("error_std", None))
+                if callable(getattr(self.masker, "feature_names", None)):
+                    row_feature_names = self.masker.feature_names(*row_args)
+                    for i in range(len(row_args)):
+                        feature_names[i].append(row_feature_names[i])
 
         # split the values up according to each input
         arg_values = [[] for a in args]
